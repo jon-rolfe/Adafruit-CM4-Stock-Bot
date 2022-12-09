@@ -22,7 +22,7 @@
 <br><br>
 
 ## What This Is
-A simple Discord and/or Slack bot that checks the stock status of all the Raspberry Pi 4 (model B) models on Adafruit and sends a message to a Discord/Slack channel when one is in stock. This bot is designed to be self-hosted and run for use in your own Discord server or Slack workspace.
+A simple Discord and/or Slack bot that checks the stock status of all the Raspberry Pi ~~4 (model B)~~ Compute Module 4 models on Adafruit and sends a message to a Discord/Slack channel when one is in stock. This bot is designed to be self-hosted and run for use in your own Discord server or Slack workspace.
 
 ## Why?
 Because Adafruit's stock notification system sucks. It's a FIFO queue where the whole queue gets cleared any time any stock comes in. This means that your notification subscription will get removed even if your notification never got triggered during restock because the restock quantity was smaller than the queue size. This means that every time any restock happens at all, even if it's small and doesn't trigger your notification, you'll have to go back and re-subscribe to the notifications. This bot removes the need for that by allowing you to quickly get a @mention in your Discord server or a message in your Slack channels every time there is a restock!
@@ -72,7 +72,7 @@ On a set interval, the bot will query Adafruit's product page for the Pi 4 model
   * Indicate whether you are using the Discord bot, Slack bot, or even both, using the `enableDiscordBot`, or `enableSlackBot` fields of the config file. These are both on(true) by default, adjust them accordingly if needed.
   * Enter the update interval in seconds for `updateIntervalSeconds` (default is 30 seconds). 
   * Set any models you don't wish to monitor to false, using `watch1GigModel`, `watch2GigNoMMCModel` and so on... (all are enabled(true) by default).
-  * Choose whether or not you want to have sleep mode enabled using `enableSleepMode`. Sleep mode just prevents the bot from querying Adafruit overnight when restocks aren't happening (this is enabled(true) by default). Prevents needless spam to Adafruit's servers!
+  * Choose whether or not you want to have sleep mode enabled using `enableSleepMode`. Sleep mode just prevents the bot from querying Adafruit overnight when restocks aren't happening (this is enabled(true) by default). Prevents needless spam to Adafruit's ser  !
 * Yay! You are now ready to start your bot! Go ahead and run `npm start` in a terminal of the project directory to launch the bot!.
 * If you are using the Discord bot, be sure to make use of the roles that the bot created! Add them to yourself and others so you get mentioned when stock comes in.
 * That's it! I hope you get your pi! :)
