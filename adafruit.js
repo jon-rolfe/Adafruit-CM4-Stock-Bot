@@ -39,24 +39,25 @@
 // -------------------------------------------
 
 const { MessageEmbed, Client, Intents, ShardClientUtil, Permissions } = require('discord.js');
-const client               = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES], shards: 'auto' });
-const axios                = require('axios').default;
-const jsdom                = require('jsdom');
-const chalk                = require('chalk');
-const fs                   = require('fs');
-const { JSDOM }            = jsdom;
-const clientShardHelper    = new ShardClientUtil(client);
-const config               = JSON.parse(fs.readFileSync('config.json', 'utf8'));
+const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES], shards: 'auto' });
+const axios = require('axios').default;
+const jsdom = require('jsdom');
+const chalk = require('chalk');
+const fs = require('fs');
+const { JSDOM } = jsdom;
+const clientShardHelper = new ShardClientUtil(client);
+const config = JSON.parse(fs.readFileSync('config.json', 'utf8'));
 let configuredGuild;       // the discord guild to send the stock status to (gets initialized in the ready event)
 
 // flags indicating current stock status of each model (used to prevent sending the same in-stock messages multiple times)
-let oneGigActive           = false;
-let twoGigActive           = false;
-let fourGigActive          = false;
-let eightGigActive         = false;
+let oneGigNoMMCActive = false;
+let twoGigNoMMCActive = false;
+let twoGig8GBMMCActive = false;
+let twoGig16GBMMCActive = false;
+let fourGig32GBMMCActive = false;
 
 // flag indicating if the bot is currently suspended from making queries to Adafruit.com (sleep mode to not query outside of their restock hours)
-let sleepModeActive        = false;
+let sleepModeActive = false;
 
 // check that at least one bot is enabled and complain to the user if not
 if (!config.enableDiscordBot && !config.enableSlackBot) {
@@ -140,8 +141,8 @@ function checkStockStatus() {
     }
   }
 
-  // proceed to make a query to the Pi 4 product page and download the source HTML
-  axios.get('https://www.adafruit.com/product/4295')
+  // proceed to make a query to the Pi Compute Module 4 product page and download the source HTML
+  axios.get('https://www.adafruit.com/product/4791')
     .then(function (response) {
       // on success, select the HTML from the response and parse it into a DOM object
       const html = response.data;
@@ -153,26 +154,28 @@ function checkStockStatus() {
       // gather the stock status of each model (represented as a boolean for being in-stock or not)
       // check if the text doesn't contain the text "Out of Stock" (will be showing the price instead if it's actually in stock)
       let oneGigModelInStock = stockList[0].textContent.toLowerCase().indexOf('out of stock') === -1;
-      let twoGigModelInStock = stockList[1].textContent.toLowerCase().indexOf('out of stock') === -1;
-      let fourGigModelInStock = stockList[2].textContent.toLowerCase().indexOf('out of stock') === -1;
-      let eightGigModelInStock = stockList[3].textContent.toLowerCase().indexOf('out of stock') === -1;
+      let twoGigNoMMCModelInStock = stockList[1].textContent.toLowerCase().indexOf('out of stock') === -1;
+      let twoGig8GigMMCInStock = stockList[2].textContent.toLowerCase().indexOf('out of stock') === -1;
+      let twoGig16GigMMCInStock = stockList[3].textContent.toLowerCase().indexOf('out of stock') === -1;
+      let fourGigModelInStock = stockList[4].textContent.toLowerCase().indexOf('out of stock') === -1;
 
       // verify that the stock status of each model has changed since the last check and update the active flags (prevents duplicate notifications)
-      checkForNewStock(oneGigModelInStock, twoGigModelInStock, fourGigModelInStock, eightGigModelInStock, (adjustedOneGig, adjustedTwoGig, adjustedFourGig, adjustedEightGig) => {
+      checkForNewStock(oneGigModelInStock, twoGigNoMMCModelInStock, twoGig8GigMMCInStock, twoGig16GigMMCInStock, fourGigModelInStock, (adjustedOneGig, adjustedTwoGigNoMMC, adjustedTwoGig8GigMMC, adjustedTwoGig16GigMMC, adjustedFourGig,) => {
         oneGigModelInStock = adjustedOneGig;
-        twoGigModelInStock = adjustedTwoGig;
+        twoGigNoMMCModelInStock = adjustedTwoGigNoMMC;
+        twoGig8GigMMCInStock = adjustedTwoGig8GigMMC;
+        twoGig16GigMMCInStock = adjustedTwoGig16GigMMC;
         fourGigModelInStock = adjustedFourGig;
-        eightGigModelInStock = adjustedEightGig;
       });
 
       // send the stock status to discord and/or slack if any of the models are in stock
-      if (oneGigModelInStock || twoGigModelInStock || fourGigModelInStock || eightGigModelInStock) {
-        console.log(chalk.yellowBright(`WE GOT STOCK! : ${oneGigModelInStock ? '1GB' : ''} ${twoGigModelInStock ? '2GB' : ''} ${fourGigModelInStock ? '4GB' : ''} ${eightGigModelInStock ? '8GB' : ''}`));
+      if (oneGigModelInStock || twoGigNoMMCModelInStock || twoGig8GigMMCInStock || twoGig16GigMMCInStock || fourGigModelInStock) {
+        console.log(chalk.yellowBright(`WE GOT STOCK! : ${oneGigModelInStock ? 'CM4 1GB (No MMC, No WiFi)' : ''} ${twoGigNoMMCModelInStock ? 'CM4 2GB (No MMC)' : ''} ${twoGig8GigMMCInStock ? 'CM4 2GB (8GB MMC)' : ''} ${twoGig16GigMMCInStock ? 'CM4 2GB (16GB MMC)' : ''} ${fourGigModelInStock ? 'CM4 4GB (32GB MMC)' : ''}`));
         if (config.enableDiscordBot) {
-          sendToDiscord(oneGigModelInStock, twoGigModelInStock, fourGigModelInStock, eightGigModelInStock);
+          sendToDiscord(oneGigModelInStock, twoGigNoMMCModelInStock, twoGig8GigMMCInStock, twoGig16GigMMCInStock, fourGigModelInStock);
         }
         if (config.enableSlackBot) {
-          sendToSlack(oneGigModelInStock, twoGigModelInStock, fourGigModelInStock, eightGigModelInStock);
+          sendToSlack(oneGigModelInStock, twoGigNoMMCModelInStock, twoGig8GigMMCInStock, twoGig16GigMMCInStock, fourGigModelInStock);
         }
       }
     })
@@ -188,7 +191,7 @@ function checkStockStatus() {
 // this function handles verifying the servers, channels, and roles for discord, then sending the actual notification message out
 // this will send *one* notification message embed that contains all models that are in stock, rather than separate messages for each model (like the slack function does)
 
-function sendToDiscord(oneGigModelInStock, twoGigModelInStock, fourGigModelInStock, eightGigModelInStock) {
+function sendToDiscord(oneGigModelInStock, twoGigNoMMCModelInStock, twoGig8GBMMCModelInStock, twoGig16GBMMCActive, fourGigModelInStock) {
   console.log(chalk.greenBright('Sending stock status to Discord...'));
   let mentionRolesMessage = ''; // will be populated with the roles to mention based on status of each model
   // grab the roles and channels cache from the configured guild
@@ -209,25 +212,31 @@ function sendToDiscord(oneGigModelInStock, twoGigModelInStock, fourGigModelInSto
 
   // populate stock fields for all in-stock models where notification is enabled in the config
   if (oneGigModelInStock && config.watch1GigModel) {
-    embed.addField('1GB Model', '[BUY IT!](https://www.adafruit.com/product/4295)', true);
-    const oneGigRole = rolesCache.find(role => role.name === 'Pi4 1GB');
+    embed.addField('1GB Model', '[BUY IT!](https://www.adafruit.com/product/4782)', true);
+    const oneGigRole = rolesCache.find(role => role.name === 'CM4 1GB');
     mentionRolesMessage += (oneGigRole) ? ` ${oneGigRole} ` : console.error(chalk.red('No 1GB role found!'));
   }
-  if (twoGigModelInStock && config.watch2GigModel) {
-    embed.addField('2GB Model', '[BUY IT!](https://www.adafruit.com/product/4292)', true);
-    const twoGigRole = rolesCache.find(role => role.name === 'Pi4 2GB');
-    mentionRolesMessage += (twoGigRole) ? ` ${twoGigRole} ` : console.error(chalk.red('No 2GB role found!'));
+  if (twoGigNoMMCModelInStock && config.watch2GigNoMMCModel) {
+    embed.addField('2GB (No MMC) Model', '[BUY IT!](https://www.adafruit.com/product/4788)', true);
+    const twoGigNoMMCRole = rolesCache.find(role => role.name === 'CM4 2GB (No MMC)');
+    mentionRolesMessage += (twoGigNoMMCRole) ? ` ${twoGigNoMMCRole} ` : console.error(chalk.red('No CM4 2GB (No MMC) role found!'));
+  }
+  if (twoGig8GBMMCModelInStock && config.watch2Gig8GigMMCModel) {
+    embed.addField('2GB (8GB MMC) Model', '[BUY IT!](https://www.adafruit.com/product/4790)', true);
+    const twoGig8GBMMCRole = rolesCache.find(role => role.name === 'CM4 2GB (16GB MMC)');
+    mentionRolesMessage += (twoGig8GBMMCRole) ? ` ${twoGig8GBMMCRole} ` : console.error(chalk.red('No CM4 2GB (8GB MMC) role found!'));
+  }
+  if (twoGig16GBMMCActive && config.watch2Gig16GigMMCModel) {
+    embed.addField('2GB (16GB MMC) Model', '[BUY IT!](https://www.adafruit.com/product/4791)', true);
+    const twoGig16GBMMCRole = rolesCache.find(role => role.name === 'CM4 2GB (8GB MMC)');
+    mentionRolesMessage += (twoGig16GBMMCRole) ? ` ${twoGig16GBMMCRole} ` : console.error(chalk.red('No CM4 2GB (16GB MMC) role found!'));
   }
   if (fourGigModelInStock && config.watch4GigModel) {
-    embed.addField('4GB Model', '[BUY IT!](https://www.adafruit.com/product/4296)', true);
-    const fourGigRole = rolesCache.find(role => role.name === 'Pi4 4GB');
-    mentionRolesMessage += (fourGigRole) ? ` ${fourGigRole} ` : console.error(chalk.red('No 4GB role found!'));
+    embed.addField('4GB Model', '[BUY IT!](https://www.adafruit.com/product/4982)', true);
+    const fourGigRole = rolesCache.find(role => role.name === 'CM4 4GB');
+    mentionRolesMessage += (fourGigRole) ? ` ${fourGigRole} ` : console.error(chalk.red('No CM4 4GB (32GB MMC) role found!'));
   }
-  if (eightGigModelInStock && config.watch8GigModel) {
-    embed.addField('8GB Model', '[BUY IT!](https://www.adafruit.com/product/4564)', true);
-    const eightGigRole = rolesCache.find(role => role.name === 'Pi4 8GB');
-    mentionRolesMessage += (eightGigRole) ? ` ${eightGigRole} ` : console.error(chalk.red('No 8GB role found!'));
-  }
+
 
   // lookup the configured discord TEXT channel by name and send the embed out to the channel
   const channel = channelsCache.find(channel => channel.name === config.discordChannelName.toString() && channel.type == 'GUILD_TEXT');
@@ -265,33 +274,39 @@ function sendToDiscord(oneGigModelInStock, twoGigModelInStock, fourGigModelInSto
 // function to send stock statuses to Slack for models that are in stock
 // this will send each model in stock as separate notification messages if multiple models are in stock at once
 
-async function sendToSlack(oneGigModelInStock, twoGigModelInStock, fourGigModelInStock, eightGigModelInStock) {
+async function sendToSlack(oneGigModelInStock, twoGigNoMMCModelInStock, twoGig8GBMMCModelInStock, twoGig16GBMMCModelInStock, fourGigModelInStock) {
   console.log(chalk.greenBright('Sending stock status to Slack...'));
   const url = 'https://slack.com/api/chat.postMessage';
   const authorizationHeader = { headers: { authorization: `Bearer ${config.slackBotToken}` } };
   if (oneGigModelInStock && config.watch1GigModel) {
     const channel = config.slackChannel1GB;
-    const username = 'PI4 1GB IN STOCK';
-    const messageText = '@channel The 1GB model is in stock on Adafruit! <https://www.adafruit.com/product/4295|BUY IT>';
+    const username = 'CM4 1GB (NO MMC, NO WIFI) IN STOCK';
+    const messageText = '@channel The 1GB (No MMC, No WiFi) model is in stock on Adafruit! <https://www.adafruit.com/product/4295|BUY IT>';
     postMessage(channel, username, messageText, '1GB');
   }
-  if (twoGigModelInStock && config.watch2GigModel) {
-    const channel = config.slackChannel2GB;
-    const username = 'PI4 2GB IN STOCK';
-    const messageText = '@channel The 2GB model is in stock on Adafruit! <https://www.adafruit.com/product/4292|BUY IT>';
-    postMessage(channel, username, messageText, '2GB');
+  if (twoGigNoMMCModelInStock && config.watch2GigNoMMCModel) {
+    const channel = config.slackChannel2GBNoMMC;
+    const username = 'CM4 2GB (NO MMC) IN STOCK';
+    const messageText = '@channel The 2GB CM4 (No MMC) model is in stock on Adafruit! <https://www.adafruit.com/product/4292|BUY IT>';
+    postMessage(channel, username, messageText, '2GB CM4 (No MMC)');
+  }
+  if (twoGig8GBMMCModelInStock && config.watch2Gig8GigMMCModel) {
+    const channel = config.slackChannel2GB8GBMMC;
+    const username = 'CM4 2GB (8GB MMC) IN STOCK';
+    const messageText = '@channel The 2GB CM4 (8GB MMC) model is in stock on Adafruit! <https://www.adafruit.com/product/4296|BUY IT>';
+    postMessage(channel, username, messageText, '2GB CM4 (8GB MMC)');
+  }
+  if (twoGig16GBMMCModelInStock && config.watch2Gig16GigMMCModel) {
+    const channel = config.slackChannel2GB16GBMMC;
+    const username = 'CM4 2GB (16GB MMC) IN STOCK';
+    const messageText = '@channel The 2GB CM4 (16GB MMC) model is in stock on Adafruit! <https://www.adafruit.com/product/4564|BUY IT>';
+    postMessage(channel, username, messageText, '2GB CM4 (16GB MMC)');
   }
   if (fourGigModelInStock && config.watch4GigModel) {
     const channel = config.slackChannel4GB;
-    const username = 'PI4 4GB IN STOCK';
-    const messageText = '@channel The 4GB model is in stock on Adafruit! <https://www.adafruit.com/product/4296|BUY IT>';
-    postMessage(channel, username, messageText, '4GB');
-  }
-  if (eightGigModelInStock && config.watch8GigModel) {
-    const channel = config.slackChannel8GB;
-    const username = 'PI4 8GB IN STOCK';
-    const messageText = '@channel The 8GB model is in stock on Adafruit! <https://www.adafruit.com/product/4564|BUY IT>';
-    postMessage(channel, username, messageText, '8GB');
+    const username = 'CM4 4GB (32GB MMC) IN STOCK';
+    const messageText = '@channel The 4GB CM4 (32GB MMC) model is in stock on Adafruit! <https://www.adafruit.com/product/4564|BUY IT>';
+    postMessage(channel, username, messageText, '4GB (32GB MMC)');
   }
 
   // nested function to post the message(s) (called for each model)
@@ -326,10 +341,11 @@ async function sendToSlack(oneGigModelInStock, twoGigModelInStock, fourGigModelI
 function setupDiscordServer() {
   // first, define the roles we need in the server based on the config (in RGB cus we're real gamers here)
   const roles = [];
-  if (config.watch1GigModel) roles.push({ name: 'Pi4 1GB', color: 'RED' });
-  if (config.watch2GigModel) roles.push({ name: 'Pi4 2GB', color: 'GREEN' });
-  if (config.watch4GigModel) roles.push({ name: 'Pi4 4GB', color: 'BLUE' });
-  if (config.watch8GigModel) roles.push({ name: 'Pi4 8GB', color: 'PURPLE' });
+  if (config.watch1GigModel) roles.push({ name: 'CM4 1GB', color: 'RED' });
+  if (config.watch2GigNoMMCModel) roles.push({ name: 'CM4 2GB (No MMC)', color: 'GREEN' });
+  if (config.watch2Gig8GigMMCModel) roles.push({ name: 'CM4 2GB (8GB MMC)', color: 'BLUE' });
+  if (config.watch2Gig16GigMMCModel) roles.push({ name: 'CM4 2GB (16GB MMC)', color: 'PURPLE' });
+  if (config.watch4GigModel) roles.push({ name: 'CM4 4GB', color: 'YELLOW' });
 
   // create the roles in the server if they don't exist yet
   roles.forEach(role => {
@@ -345,7 +361,7 @@ function setupDiscordServer() {
   });
   // create the notification channel if an existing one wasn't specified in the config (this will also trigger if configured channel is misspelled or in wrong case in config file)
   if (!configuredGuild.channels.cache.find(c => c.name == config.discordChannelName)) {
-    configuredGuild.channels.create('pi4-stock-notifications', {
+    configuredGuild.channels.create('cm4-stock-notifications', {
       type: 'GUILD_TEXT',
       permissionOverwrites: [
         {
@@ -356,7 +372,7 @@ function setupDiscordServer() {
     })
       .then(channel => {
         // set the notification channel in the config to be this new one (so it can be used in the future)
-        config.discordChannelName = 'pi4-stock-notifications';
+        config.discordChannelName = 'cm4-stock-notifications';
         fs.writeFileSync('config.json', JSON.stringify(config, null, 2));
         console.log(chalk.green('You didn\'t provide a channel name or it wasn\'t able to be found in the server, so I created one for you!'));
         console.log(chalk.green(`The new channel is named: ${chalk.cyan(channel.name)}`));
@@ -378,56 +394,67 @@ function setupDiscordServer() {
 // this is done so we don't send another notification for a model that has already had a notification sent for it
 // the active status flags get reset when the models go out of stock again so that the next restock will be captured
 
-function checkForNewStock(oneGigModelInStock, twoGigModelInStock, fourGigModelInStock, eightGigModelInStock, cb) {
+function checkForNewStock(oneGigModelInStock, twoGigNoMMCModelInStock, twoGig8GBMMCModelInStock, twoGig16GBMMCModelInStock, fourGigModelInStock, cb) {
   // first, ignore if in stock but has already had notification sent (active)
-  if (oneGigModelInStock && oneGigActive) {
+  if (oneGigModelInStock && oneGigNoMMCActive) {
     oneGigModelInStock = false;
   }
   else {
     // in stock and wasn't previously, send a notification and update the active status flag
-    if (oneGigModelInStock && !oneGigActive) {
-      oneGigActive = true;
+    if (oneGigModelInStock && !oneGigNoMMCActive) {
+      oneGigNoMMCActive = true;
     }
-    if (!oneGigModelInStock && oneGigActive) {
-      oneGigActive = false;
+    if (!oneGigModelInStock && oneGigNoMMCActive) {
+      oneGigNoMMCActive = false;
     }
   }
-  if (twoGigModelInStock && twoGigActive) {
-    twoGigModelInStock = false;
+  if (twoGigNoMMCModelInStock && twoGigNoMMCActive) {
+    twoGigNoMMCModelInStock = false;
   }
   else {
-    if (twoGigModelInStock && !twoGigActive) {
-      twoGigActive = true;
+    if (twoGigNoMMCModelInStock && !twoGigNoMMCActive) {
+      twoGigNoMMCActive = true;
     }
-    if (!twoGigModelInStock && twoGigActive) {
-      twoGigActive = false;
+    if (!twoGigNoMMCModelInStock && twoGigNoMMCActive) {
+      twoGigNoMMCActive = false;
     }
   }
-  if (fourGigModelInStock && fourGigActive) {
+  if (twoGig8GBMMCModelInStock && twoGig8GBMMCActive) {
+    twoGig8GBMMCModelInStock = false;
+  }
+  else {
+    if (twoGig8GBMMCModelInStock && !twoGig8GBMMCActive) {
+      twoGig8GBMMCActive = true;
+    }
+    if (!twoGig8GBMMCModelInStock && twoGig8GBMMCActive) {
+      twoGig8GBMMCActive = false;
+    }
+  }
+  if (twoGig16GBMMCModelInStock && twoGig16GBMMCActive) {
+    twoGig16GBMMCModelInStock = false;
+  }
+  else {
+    if (twoGig16GBMMCModelInStock && !twoGig16GBMMCActive) {
+      twoGig16GBMMCActive = true;
+    }
+    if (!twoGig16GBMMCModelInStock && twoGig16GBMMCActive) {
+      twoGig16GBMMCActive = false;
+    }
+  }
+  if (fourGigModelInStock && fourGig32GBMMCActive) {
     fourGigModelInStock = false;
   }
   else {
-    if (fourGigModelInStock && !fourGigActive) {
-      fourGigActive = true;
+    if (fourGigModelInStock && !fourGig32GBMMCActive) {
+      fourGig32GBMMCActive = true;
     }
-    if (!fourGigModelInStock && fourGigActive) {
-      fourGigActive = false;
-    }
-  }
-  if (eightGigModelInStock && eightGigActive) {
-    eightGigModelInStock = false;
-  }
-  else {
-    if (eightGigModelInStock && !eightGigActive) {
-      eightGigActive = true;
-    }
-    if (!eightGigModelInStock && eightGigActive) {
-      eightGigActive = false;
+    if (!fourGigModelInStock && fourGig32GBMMCActive) {
+      fourGig32GBMMCActive = false;
     }
   }
 
   // return the updated statuses
-  cb(oneGigModelInStock, twoGigModelInStock, fourGigModelInStock, eightGigModelInStock);
+  cb(oneGigModelInStock, twoGigNoMMCModelInStock, twoGig8GBMMCModelInStock, twoGig16GBMMCModelInStock, fourGigModelInStock);
 }
 
 

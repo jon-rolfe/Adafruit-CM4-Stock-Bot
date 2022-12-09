@@ -71,7 +71,7 @@ On a set interval, the bot will query Adafruit's product page for the Pi 4 model
 * In the `config.json` file:
   * Indicate whether you are using the Discord bot, Slack bot, or even both, using the `enableDiscordBot`, or `enableSlackBot` fields of the config file. These are both on(true) by default, adjust them accordingly if needed.
   * Enter the update interval in seconds for `updateIntervalSeconds` (default is 30 seconds). 
-  * Set any models you don't wish to monitor to false, using `watch1GigModel`, `watch2GigModel` and so on... (all are enabled(true) by default).
+  * Set any models you don't wish to monitor to false, using `watch1GigModel`, `watch2GigNoMMCModel` and so on... (all are enabled(true) by default).
   * Choose whether or not you want to have sleep mode enabled using `enableSleepMode`. Sleep mode just prevents the bot from querying Adafruit overnight when restocks aren't happening (this is enabled(true) by default). Prevents needless spam to Adafruit's servers!
 * Yay! You are now ready to start your bot! Go ahead and run `npm start` in a terminal of the project directory to launch the bot!.
 * If you are using the Discord bot, be sure to make use of the roles that the bot created! Add them to yourself and others so you get mentioned when stock comes in.

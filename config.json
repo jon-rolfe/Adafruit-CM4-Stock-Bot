@@ -7,12 +7,14 @@
   "discordChannelName": "",
   "slackBotToken": "",
   "slackChannel1GB": "",
-  "slackChannel2GB": "",
+  "slackChannel2GBNoMMC": "",
+  "slackChannel2GB8GBMMC": "",
+  "slackChannel2GB6GBMMC": "",
   "slackChannel4GB": "",
-  "slackChannel8GB": "",
   "updateIntervalSeconds": 30,
   "watch1GigModel": true,
-  "watch2GigModel": true,
-  "watch4GigModel": true,
-  "watch8GigModel": true
+  "watch2GigNoMMCModel": true,
+  "watch2Gig8GigMMCModel": true,
+  "watch2Gig16GigMMCModel": true,
+  "watch4GigModel"
 }
